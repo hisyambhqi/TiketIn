@@ -87,7 +87,7 @@
                 return;
             }
 
-            const respon = await fetch('http://localhost:3000/api/validate-ticket', {
+            const respon = await fetch('https://hisyambhqi-tiketin-backend.hf.space', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ bookingId: dataObj.bookingId })
