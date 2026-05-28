@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Scanner - Fast-Tix Staff Only</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; color: #fff; }
+        .scanner-card { background: #1e293b; border: none; border-radius: 24px; overflow: hidden; }
+        #reader { width: 100%; border-radius: 16px; overflow: hidden; background: #000; }
+        .status-box { border-radius: 16px; padding: 1.5rem; text-align: center; font-weight: bold; font-size: 1.2rem; }
+        .login-box { max-width: 400px; margin: 100px auto; background: #1e293b; padding: 30px; border-radius: 24px; }
+    </style>
+</head>
+<body>
+
+<!-- [PANEL 1] Form Login Password (Awalnya Muncul) -->
+<div id="authPanel" class="container">
+    <div class="login-box shadow-lg text-center">
+        <h4 class="fw-bold text-warning mb-3">STAFF GATE ONLY</h4>
+        <p class="text-white-50 small mb-4">Masukkan kode akses gerbang untuk mengaktifkan kamera scanner.</p>
+        <div class="mb-3">
+            <input type="password" id="inputPassword" class="form-control text-center py-2.5" placeholder="••••••••" style="border-radius: 12px;">
+        </div>
+        <button class="btn btn-warning w-100 fw-bold py-2" style="border-radius: 12px;" onclick="cekAkses()">Masuk Aplikasi</button>
+    </div>
+</div>
+
+<!-- [PANEL 2] Scanner Utama (Awalnya Tersembunyi / d-none) -->
+<div id="scannerPanel" class="container my-5 d-none">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-warning">FAST.TIX VALIDATOR</h3>
+                <p class="text-white-50 small">Arahkan kamera ke QR Code Tiket pengunjung</p>
+            </div>
+
+            <div class="card scanner-card p-4 shadow-lg">
+                <div id="reader" class="mb-4"></div>
+                <div id="scanResultStatus" class="status-box bg-secondary text-white">
+                    Menunggu QR Code terdeteksi...
+                </div>
+                <div id="detailTiket" class="mt-4 p-3 bg-dark rounded d-none">
+                    <h6 class="text-warning border-bottom pb-2">DATA PENGUNJUNG</h6>
+                    <p class="mb-1 small">Nama: <span id="resNama" class="fw-bold text-white"></span></p>
+                    <p class="mb-1 small">Acara: <span id="resEvent" class="fw-bold text-white"></span></p>
+                    <p class="mb-0 small">ID Tiket: <span id="resId" class="text-white-50"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+    // TENTUKAN PASSWORD DI SINI (Bisa diganti bebas)
+    const PASSWORD_GATE = "panitia2026"; 
+
+    function cekAkses() {
+        const input = document.getElementById('inputPassword').value;
+        if (input === PASSWORD_GATE) {
+            // Jika benar, sembunyikan form login dan tampilkan scanner
+            document.getElementById('authPanel').classList.add('d-none');
+            document.getElementById('scannerPanel').classList.remove('d-none');
+            
+            // Jalankan kamera hanya setelah password benar
+            startScanner();
+        } else {
+            alert('Password salah! Akses ditolak.');
+        }
+    }
+
+    function startScanner() {
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+    }
+
+    async function onScanSuccess(decodedText) {
+        const statusBox = document.getElementById('scanResultStatus');
+        const detailBox = document.getElementById('detailTiket');
+        try {
+            const dataObj = JSON.parse(decodedText);
+            if(!dataObj.bookingId) {
+                tampilkanGagal("Format QR Code salah!");
+                return;
+            }
+
+            const respon = await fetch('http://localhost:3000/api/validate-ticket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId: dataObj.bookingId })
+            });
+            const hasil = await respon.json();
+
+            if (hasil.success) {
+                statusBox.className = "status-box bg-success text-white";
+                statusBox.innerHTML = "✅ TIKET VALID - SILAKAN MASUK";
+                document.getElementById('resNama').innerText = dataObj.nama;
+                document.getElementById('resEvent').innerText = dataObj.event;
+                document.getElementById('resId').innerText = dataObj.bookingId;
+                detailBox.classList.remove('d-none');
+            } else {
+                tampilkanGagal("❌ " + hasil.message);
+            }
+        } catch (err) {
+            tampilkanGagal("Gagal membaca kode QR.");
+        }
+    }
+
+    function tampilkanGagal(pesan) {
+        document.getElementById('scanResultStatus').className = "status-box bg-danger text-white";
+        document.getElementById('scanResultStatus').innerHTML = pesan;
+        document.getElementById('detailTiket').classList.add('d-none');
+    }
+</script>
+</body>
+</html>
